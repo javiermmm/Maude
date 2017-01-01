@@ -1,0 +1,66 @@
+fmod ARBIN is
+ pr NAT .
+
+ sort Arbin .
+
+
+*** VARIABLES
+vars N N' K K' V V' : Nat .
+vars Hi Hd : Arbin .
+
+
+
+*** Apartado a
+op av : -> Arbin [ctor] .
+op _ _ _ _ : Nat Nat Arbin Arbin -> Arbin [ctor] .
+
+
+*** Apartado b   
+op mezcla : Nat Nat -> Nat .
+eq mezcla (N, N') = N + N' .
+
+
+*** Apartado c
+op inserta : Arbin Nat Nat -> Arbin .
+eq inserta(av, K, V) = K V av av .
+eq inserta (K V Hi Hd , K' , V') = 
+   if K' < K then K V inserta (Hi , K' , V') Hd
+   else if K' > K then K V Hi inserta (Hd , K' , V')
+        else  (K mezcla (V , V') Hi Hd )
+        fi
+   fi .
+
+*** Apartado d
+op busca : Arbin Nat ~> Nat .
+eq busca (K V Hi Hd , N) = 
+   if K == N then V
+   else if N < K then busca (Hi , N)
+        else busca (Hd , N)
+        fi
+   fi .
+
+endfm
+
+
+
+
+*********************
+***    PRUEBAS
+*********************
+
+red 99 10 av av .
+
+
+red 5 10 (3 10 av av) (7 10 (6 10 av av) av) .
+
+
+red inserta (5 10 (3 10 av av) (7 10 (6 10 av av) av) , 8 , 10) .
+
+
+red inserta (5 10 (3 10 av av) (7 10 (6 10 av av) av) , 6 , 20) .
+
+
+red busca (5 10 (3 10 av av) (7 10 (6 10 av av) av) , 7) .
+
+
+red busca (5 10 (3 10 av av) (7 10 (6 10 av av) av) , 9) .

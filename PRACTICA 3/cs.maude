@@ -1,0 +1,160 @@
+load process.maude
+
+mod CRITICAL is
+  pr HEAP .
+
+  *** A process with default ("ProcessWD") is a generalized process that can
+  *** also be equal to "noProcess".
+  sort ProcessWD .
+  subsort Process < ProcessWD .
+  op noProcess : -> ProcessWD [ctor] .
+
+  *** The sort "Processes" stands for a soup of processes built with
+  *** the juxtaposition operator,"__", while a "CPU" is a multiset of processes,
+  *** a heap that orders the processes by using their priority, and a
+  *** critical section represented by a process with default.
+  sorts Processes CPU .
+  subsort Process < Processes .
+
+  op empty : -> Processes [ctor] .
+  op __ : Processes Processes -> Processes [ctor assoc] . ***[###############]
+  op _[_][_] : Processes Heap ProcessWD -> CPU [ctor] . ***[###############]
+
+  var N : Nat .
+  var H : Heap .
+  var P : Process .
+  var PS : Processes .
+  var S : String .
+  var PWD : ProcessWD .
+
+  *** The rule "ask" introduces a process into the heap, where it is
+  *** appropriately located.
+  rl [ask] : P PS [H] [PWD] => PS [insert (P, H)] [PWD] . ***############################################# 
+
+  *** The process with the highest priority in the heap (i.e., the root)
+  *** is introduced with the "cs" rule in the critical section if it is empty.
+  crl [cs] : PS [H] [noProcess] => PS [delete(H)] [root(H)] ***###############
+   if not empty(H) .
+
+  *** The rule "exit" takes the process in the critical section to the
+  *** soup of inactive processes.
+  rl [exit] : PS [H] [P] => PS P [H] [noProcess] . ***#############################################
+
+  *** The constants "p1", "p2", "p3", and "initial" are created for
+  *** testing purposes.
+  ops p1 p2 p3 : -> Process .
+  eq p1 = < "p1", 5 > .
+  eq p2 = < "p2", 4 > .
+  eq p3 = < "p3", 3 > .
+
+  op initial : -> CPU .
+  eq initial = p1 p2 p3 [empty] [noProcess] .
+endm
+
+eof
+
+Maude> rew [5] initial .
+*** Se dan 5 pasos en la aplicacion de reglas para la CPU con configuracion initial
+*** result CPU: (< "p2",4 > < "p3",3 >)[empty][< "p1",5 >]
+
+Maude> rew [7] initial .
+*** Se dan 7 pasos en la aplicacion de reglas para la CPU con configuracion initial
+*** result CPU: (< "p1",5 > < "p2",4 >)[empty[< "p3",3 >]empty][noProcess]
+
+Maude> search initial =>* PS:Processes [H:Heap] [< "p3", N:Nat >] .
+*** Se buscan una o mas soluciones  en las que la sección crítica está ocupada por el proceso "p3"
+*** Solution 1 (state 13)
+*** states: 14  rewrites: 218 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p1",5 > < "p2",4 >
+*** H --> (empty).Heap
+*** N --> 3
+*** 
+*** Solution 2 (state 15)
+*** states: 16  rewrites: 249 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p2",4 >
+*** H --> empty[< "p1",5 >]empty
+*** N --> 3
+*** 
+*** Solution 3 (state 17)
+*** states: 18  rewrites: 294 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p2",4 > < "p1",5 >
+*** H --> (empty).Heap
+*** N --> 3
+*** 
+*** Solution 4 (state 18)
+*** states: 19  rewrites: 298 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p1",5 >
+*** H --> empty[< "p2",4 >]empty
+*** N --> 3
+*** 
+*** No more solutions.
+*** states: 27  rewrites: 416 in 0ms cpu (0ms real) (~ rewrites/second)
+
+
+Maude> search initial =>* PS:Processes [H:Heap] [< S:String, N:Nat >] s.t. S:String == "p2" .
+*** Se buscan una o mas soluciones en las que la sección crítica está ocupada por el proceso "p2". 
+*** Es casi lo mismo que el apartado anterior.
+*** Solution 1 (state 8)
+*** states: 9  rewrites: 139 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p3",3 > < "p1",5 >
+*** H --> (empty).Heap
+*** S --> "p2"
+*** N --> 4
+*** 
+*** Solution 2 (state 9)
+*** states: 10  rewrites: 167 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p1",5 >
+*** H --> empty[< "p3",3 >]empty
+*** S --> "p2"
+*** N --> 4
+*** 
+*** Solution 3 (state 21)
+*** states: 22  rewrites: 359 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p1",5 > < "p3",3 >
+*** H --> (empty).Heap
+*** S --> "p2"
+*** N --> 4
+*** 
+*** Solution 4 (state 22)
+*** states: 23  rewrites: 364 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p3",3 >
+*** H --> empty[< "p1",5 >]empty
+*** S --> "p2"
+*** N --> 4
+*** 
+*** No more solutions.
+*** states: 27  rewrites: 428 in 0ms cpu (0ms real) (~ rewrites/second)
+
+
+Maude> search initial =>* PS:Processes [H:Heap] [< S:String, N:Nat >] such that S:String == "p1" .
+*** De nuevo, se procede de manera análoga para el proceso "p1"
+*** Solution 1 (state 3)
+*** states: 4  rewrites: 55 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p2",4 > < "p3",3 >
+*** H --> (empty).Heap
+*** S --> "p1"
+*** N --> 5
+*** 
+*** Solution 2 (state 4)
+*** states: 5  rewrites: 83 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p3",3 >
+*** H --> empty[< "p2",4 >]empty
+*** S --> "p1"
+*** N --> 5
+*** 
+*** Solution 3 (state 14)
+*** states: 15  rewrites: 251 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p2",4 >
+*** H --> empty[< "p3",3 >]empty
+*** S --> "p1"
+*** N --> 5
+*** 
+*** Solution 4 (state 25)
+*** states: 26  rewrites: 416 in 0ms cpu (0ms real) (~ rewrites/second)
+*** PS --> < "p3",3 > < "p2",4 >
+*** H --> (empty).Heap
+*** S --> "p1"
+*** N --> 5
+*** 
+*** No more solutions.
+*** states: 27  rewrites: 428 in 0ms cpu (0ms real) (~ rewrites/second)

@@ -1,0 +1,48 @@
+fmod LISTA is
+ pr NAT .
+
+ sorts Lista ListaOrd .
+ subsort Nat < ListaOrd < Lista .
+
+ op lv : -> ListaOrd [ctor] .
+ op __ : Lista Lista -> Lista [ctor assoc id: lv] .
+
+ vars P P' : Nat .
+ vars L L' : Lista .
+ var  LO : ListaOrd .
+
+ cmb P P' L : ListaOrd
+  if P <= P' /\
+     P' L : ListaOrd .
+
+ op head : Lista ~> Nat .
+ eq head(P L) = P .
+
+ op tail : Lista ~> Lista .
+ eq tail(P L) = L .
+
+ op tam : Lista -> Nat .
+ eq tam(lv) = 0 .
+ eq tam(P L) = s(tam(L)) .
+
+ op esta? : Lista Nat -> Bool .
+ eq esta?(L P L', P) = true .
+ eq esta?(L, P) = false [owise] .
+
+ op ordena : Lista -> Lista .
+ ceq ordena(L P P' L') = ordena(L P' P L')
+  if P > P' .
+ eq ordena(L) = L [owise] .
+
+ op inserta-ord : ListaOrd Nat -> ListaOrd .
+ eq inserta-ord(lv, P) = P .
+ eq inserta-ord(P L, P') = if P <= P'
+                           then P inserta-ord(L, P')
+                           else P' P L
+                           fi .
+
+ op ordena-por-insercion : ListaOrd -> ListaOrd .
+ eq ordena-por-insercion(lv) = lv .
+ ceq ordena-por-insercion(P L) = inserta-ord(L', P)
+  if L' := ordena-por-insercion(L) .
+endfm

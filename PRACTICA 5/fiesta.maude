@@ -1,0 +1,493 @@
+*************************************
+*** JAVIER MARTÍN MORENO-MANZANARO
+*************************************
+
+
+
+****************************
+*** EJERCICIO 1
+****************************
+fmod PERSONA is
+	pr STRING .
+
+	sort Persona .
+
+	*** Nombre, edad, copas, VIP
+	op <_,_,_,_> : String Nat Nat Bool -> Persona [ctor].
+
+	vars S S' : String .
+	vars N N' C C' : Nat .
+	var V V' : Bool .
+
+	op nombre : Persona -> String .
+	eq nombre (  < S, N, C, V > ) = S .
+
+	op edad : Persona -> Nat .
+	eq edad ( < S, N, C, V > ) = N .
+	
+	op copas : Persona -> Nat .
+	eq copas ( < S, N, C, V > ) = C .
+	
+	op esVip : Persona -> Bool .
+	eq esVip ( < S, N, C, V > ) = V .
+
+	ops max min : Persona Persona -> Persona [comm] .
+
+	ceq [max] : max(< S, N, C, V >, < S', N', C', V' >) = < S, N, C, V >
+	if N >= N' .
+	ceq [min] : min(< S, N, C, V >, < S', N', C', V' >) = < S, N, C, V >
+	if N <= N' .
+
+	ops _<=_ _>_ : Persona Persona -> Bool .
+	eq < S, N, C, V > <= < S', N', C', V' > = N <= N' .
+	eq < S, N, C, V > > < S', N', C', V' > = N > N' .
+
+	*** Para hacer tests de manera más clara
+	ops a b c d : -> Persona .
+	eq a = < "a", 100, 0, true > .
+	eq b = < "b", 80, 0, false > .
+	eq c = < "c", 150, 0, true > .
+	eq d = < "d", 10, 0, false > .
+ 
+endfm
+
+fmod LISTAPERSONAS is
+	pr PERSONA .
+
+	sort Lista .
+	subsort Persona < Lista .
+
+	op lv : -> Lista [ctor] .
+	op __ : Lista Lista -> Lista [ctor assoc id: lv] .
+
+	vars P P' : Persona .
+	vars L L' : Lista .
+	var S : String .
+
+	op head : Lista ~> Persona .
+	eq head(P L) = P .
+
+	op tail : Lista ~> Lista .
+	eq tail(P L) = L .
+
+	op tam : Lista -> Nat .
+	eq tam(lv) = 0 .
+	eq tam(P L) = s(tam(L)) .
+
+	op esta? : Lista Persona -> Bool .
+	eq esta?(L P L', P) = true .
+	eq esta?(L, P) = false [owise] .
+	
+	op esta? : Lista String -> Bool .
+	eq esta? (lv, S) = false .
+	eq esta? (L P, S) = ((nombre(P) == S) or (esta?(L,S))) .
+
+	op ordena : Lista -> Lista .
+	ceq ordena(L P P' L') = ordena(L P' P L')
+	if P > P' .
+	eq ordena(L) = L [owise] .
+
+	op quitaPrimero : Lista -> Lista .
+	eq quitaPrimero(lv) = lv .
+	eq quitaPrimero(P L) = L [owise] .
+	
+	op inserta-ord : Lista Persona -> Lista .
+	eq inserta-ord(lv, P) = P .
+	ceq inserta-ord(L P, P') = L P P'
+	if esVip(P) or (not esVip(P) and not esVip(P')) .
+	ceq inserta-ord(L P, P') = inserta-ord (L, P') P
+	if esVip(P') and not esVip(P) .
+ 
+endfm
+
+fmod CJTOPERSONAS is
+	pr PERSONA .
+
+	sort CjtoPersonas .
+	subsort Persona < CjtoPersonas .
+
+	op cv : -> CjtoPersonas [ctor] .
+	op _,_ : CjtoPersonas CjtoPersonas -> CjtoPersonas [ctor assoc comm id: cv] .
+
+	var C : CjtoPersonas .
+	var P : Persona .
+	var S : String .
+ 
+	op estaEnCjto? : CjtoPersonas String -> Bool .
+	eq estaEnCjto? (cv, S) = false .
+	eq estaEnCjto? ((P,C), S) = 
+		if (nombre(P) == S) 
+		then true
+		else
+			estaEnCjto? (C,S) 
+		fi .
+		
+	op cantidad : CjtoPersonas -> Nat .
+	eq cantidad(cv) = 0 .
+	eq cantidad(P,C) = 1 + cantidad (C) .
+endfm
+
+fmod LOCAL is
+	pr NAT .
+	pr CJTOPERSONAS .
+
+	sort Local .
+	*** gente en el local|aforo alcohol refrescos 
+	op _|___ : CjtoPersonas Nat Nat Nat -> Local [ctor] .
+ 
+endfm
+
+mod FIESTA is
+	pr LOCAL .
+	pr LISTAPERSONAS .
+	
+	sort Fiesta .
+	*** [local] [cola] [esperando] 
+	op [_][_][_] : Local Lista CjtoPersonas -> Fiesta [ctor] . 
+	
+	var C C' : CjtoPersonas .
+	var L : Lista .
+	var LO : Local .
+	var P : Persona .
+	vars E CO A R AL : Nat .
+	var S : String .
+	var V : Bool .
+	
+	rl [ponerEnCola] : 
+	[LO] [L] [P , C]
+	=>
+	[LO] [inserta-ord(L, P)] [C] .
+
+	crl [entrarALocal] : 
+	[C' | A R AL] [P L] [C]
+	=>
+	[C' , P | sd(A, 1) R AL] [L] [C] 
+	if (edad(P) >= 18) /\ (A >= 1) .
+
+	crl [ponerAEsperar] : 
+	[C' | A R AL] [P L] [C]
+	=>
+	[C' | A R AL] [L] [P , C] 
+	if (edad(P) < 18) .
+	
+	crl [BebeRefresco] : 
+	[P , C' | A R AL] [L] [C]
+	=>
+	[P , C' | A sd(R, 1) AL] [L] [C] 
+	if (R >= 1) /\ (nombre(P) =/= "Dabi") .
+	
+	crl [BebeCopa] : 
+	[< S, E, CO, V > , C' | A R AL] [L] [C]
+	=>
+	[< S, E, CO + 1, V > , C' | A sd(R, 1) sd(AL, 1)] [L] [C] 
+	if (CO < 4) /\ (S =/= "Dabi") /\ (R >= 1) /\ (AL >= 1).
+
+	crl [BorrachoFuera] : 
+	[P , C' | A R AL] [L] [C]
+	=>
+	[C' | A R AL] [L] [C] 
+	if (copas(P) > 3) .
+
+	crl [salirDeLocal] : 
+	[P , C' | A R AL] [L] [C]
+	=>
+	[C' | A + 1 R AL] [L] [C] 
+	if (nombre(P) =/= "Dabi") .
+endm
+
+
+
+load model-checker.maude
+****************************
+*** EJERCICIO 3
+****************************
+mod PROPS is
+	pr FIESTA .
+	pr SATISFACTION .
+
+	subsort Fiesta < State .
+
+	var  S : String .
+	vars C C' : CjtoPersonas .
+	vars A R AL X : Nat .
+	var  L : Lista .
+
+	op alcoholAcabado? :  -> Prop [ctor] .
+	eq 	[C | A R AL] [L] [C'] 
+		|= 
+		alcoholAcabado? = AL == 0 .
+	
+	op refrescosAcabados? :  -> Prop [ctor] .
+	eq 	[C | A R AL] [L] [C'] 
+		|= 
+		refrescosAcabados? = R == 0 .
+		
+	op estaEnLaCola? : String -> Prop [ctor] .
+	eq 	[C | A R AL] [L] [C']  
+		|= 
+		estaEnLaCola? (S) = esta? (L, S) .
+		
+	op estaEnLocal? : String -> Prop [ctor] .
+	eq 	[C | A R AL] [L] [C']  
+		|= 
+		estaEnLocal? (S) = estaEnCjto? (C, S) .
+		
+	op menosClientesDeXEnLocal? : Nat -> Prop [ctor] .
+	eq 	[C | A R AL] [L] [C']  
+		|= 
+		menosClientesDeXEnLocal? (X) = A < X .
+		*** En un principio, conté personas, con el operador cantidad de los conjuntos
+		*** pero entonces estoy contando al manager, que no cuenta para el aforo.
+		*** Por eso, me fijo en el aforo, cuyo tamaño es inversamente proporcional a
+		*** la cantidad de gente, pero se mueve en el mismo rango.
+
+endm
+
+
+
+****************************
+*** EJERCICIO 2
+****************************
+mod EJEMPLO is
+	pr FIESTA .
+	pr PROPS .
+	pr LTL-SIMPLIFIER .
+	pr MODEL-CHECKER .
+
+	op initial : -> Fiesta .
+	eq initial = [< "Dabi", 23, 0, true > , cv | 4 5 6]
+		     [lv] 
+		     [< "AAA", 34, 0, false > , < "BBB", 17, 0, false > , < "CCC", 21, 0, false > , 
+		      < "DDD", 18, 0, true > , < "EEE", 19, 0, false > , < "FFF", 26, 0, true >] .
+
+endm
+
+
+
+eof
+
+
+
+****************************
+*** EJERCICIO 4
+****************************
+Maude> red modelCheck (initial, [] estaEnLocal? ("Dabi") ) .
+reduce in EJEMPLO : modelCheck(initial, []estaEnLocal?("Dabi")) .
+rewrites: 15835823 in 9784ms cpu (9783ms real) (1618542 rewrites/second)
+result Bool: true
+***
+El resultado es cierto porque en la configuracion inicial pusimos a "Dabi" dentro del local, 
+y ninguna regla le hace salir.
+
+
+Maude> red modelCheck (initial, menosClientesDeXEnLocal? (5) -> [] menosClientesDeXEnLocal? (5) ) .
+reduce in EJEMPLO : modelCheck(initial, menosClientesDeXEnLocal?(5) -> []menosClientesDeXEnLocal?(5)) .
+rewrites: 14157899 in 9596ms cpu (9594ms real) (1475395 rewrites/second)
+result Bool: true
+***
+El resultado es cierto, puesto que la regla de entrada al local, no permite pasar a clientes 
+si el aforo no es de, al menos, 1.
+
+
+Maude> red modelCheck (initial, [] (estaEnLaCola? ("AAA") -> <> estaEnLocal? ("AAA")) ) .
+reduce in EJEMPLO : modelCheck(initial, [](estaEnLaCola?("AAA") -> <> estaEnLocal?("AAA"))) .
+rewrites: 18332326 in 10960ms cpu (10961ms real) (1672657 rewrites/second)
+result Bool: true
+***
+Este ejemplo, entendido como representante de casi todas las personas da true por que efectivamente 
+siempre que alguien se pone en la cola, lo hace con la intencion de acabar pasando y así sucede.
+Sin embargo, esto pasa siempre y cuando la persona sea mayor de edad. Si la misma comprobación
+la hiciéramos con "BBB", que es menor de edad, obtenemos esto:
+Maude> red modelCheck (initial, [] (estaEnLaCola? ("BBB") -> <> estaEnLocal? ("BBB")) ) .
+reduce in EJEMPLO : modelCheck(initial, [](estaEnLaCola?("BBB") -> <> estaEnLocal?("BBB"))) .
+rewrites: 896 in 12ms cpu (10ms real) (74666 rewrites/second)
+result ModelCheckResult: counterexample({[< "Dabi",23,0,true > | 4 5 6][lv][< "AAA",34,0,false >,< "BBB",17,0,
+    false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[<
+    "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false >][< "BBB",17,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true
+    >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false >
+    < "BBB",17,0,false >][< "CCC",21,0,false >,< "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],
+    'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false >][
+    < "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][<
+    "DDD",18,0,true > < "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false >][< "EEE",19,0,false >,<
+    "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "DDD",18,0,true > < "AAA",34,0,false > <
+    "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",
+    23,0,true > | 4 5 6][< "DDD",18,0,true > < "FFF",26,0,true > < "AAA",34,0,false > < "BBB",17,0,false > <
+    "CCC",21,0,false > < "EEE",19,0,false >][cv],'entrarALocal} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >) | 3 5
+    6][< "FFF",26,0,true > < "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][
+    cv],'entrarALocal} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 2 5 6][< "AAA",34,0,
+    false > < "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][cv],'entrarALocal} {[(< "AAA",34,0,
+    false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 5 6][< "BBB",17,0,false > < "CCC",
+    21,0,false > < "EEE",19,0,false >][cv],'ponerAEsperar} {[(< "AAA",34,0,false >,< "DDD",18,0,true >,< "Dabi",
+    23,0,true >,< "FFF",26,0,true >) | 1 5 6][< "CCC",21,0,false > < "EEE",19,0,false >][< "BBB",17,0,false >],
+    'ponerEnCola} {[(< "AAA",34,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 5 6][<
+    "CCC",21,0,false > < "EEE",19,0,false > < "BBB",17,0,false >][cv],'entrarALocal} {[(< "AAA",34,0,false >,<
+    "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 5 6][< "EEE",19,0,false >
+    < "BBB",17,0,false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,<
+    "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 4 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'BebeRefresco}
+    {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0
+    3 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false
+    >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 2 6][< "EEE",19,0,false > < "BBB",17,0,
+    false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,
+    true >,< "FFF",26,0,true >) | 0 1 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'BebeRefresco} {[(< "AAA",
+    34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 0 6][<
+    "EEE",19,0,false > < "BBB",17,0,false >][cv],'salirDeLocal} {[(< "CCC",21,0,false >,< "DDD",18,0,true >,<
+    "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 0 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'entrarALocal}
+    {[(< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 0
+    0 6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[(< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true
+    >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 0 0 6][lv][< "BBB",17,0,false >],'salirDeLocal} {[(< "DDD",18,0,
+    true >,< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 1 0 6][lv][< "BBB",17,0,false >],
+    'ponerEnCola} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 1 0 6][<
+    "BBB",17,0,false >][cv],'salirDeLocal} {[(< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 2 0
+    6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[(< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >)
+    | 2 0 6][lv][< "BBB",17,0,false >],'salirDeLocal} {[(< "Dabi",23,0,true >,< "FFF",26,0,true >) | 3 0 6][lv][<
+    "BBB",17,0,false >],'ponerEnCola} {[(< "Dabi",23,0,true >,< "FFF",26,0,true >) | 3 0 6][< "BBB",17,0,false >][
+    cv],'salirDeLocal}, {[< "Dabi",23,0,true > | 4 0 6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[< "Dabi",23,0,
+    true > | 4 0 6][lv][< "BBB",17,0,false >],'ponerEnCola})
+  
+
+Maude> red modelCheck (initial, [] (~ alcoholAcabado?) ) .
+reduce in EJEMPLO : modelCheck(initial, []~ alcoholAcabado?) .
+rewrites: 14157889 in 10160ms cpu (10160ms real) (1393493 rewrites/second)
+result Bool: true
+***
+El resultado es cierto, ya que en la configuracion inicial, hemos puesto una unidad más de alcohol
+que de refresco, y los clientes NO tienen la posibilidad de beber alcohol "a palo seco", sino que
+deben acompañarlo siempre con refresco, por lo que estos se acabarán antes siempre.
+
+
+Maude> red modelCheck (initial, [] (<> refrescosAcabados?) ) .
+reduce in EJEMPLO : modelCheck(initial, []<> refrescosAcabados?) .
+rewrites: 682 in 8ms cpu (10ms real) (85250 rewrites/second)
+result ModelCheckResult: counterexample({[< "Dabi",23,0,true > | 4 5 6][lv][< "AAA",34,0,false >,< "BBB",17,0,
+    false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[<
+    "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false >][< "BBB",17,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true
+    >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false >
+    < "BBB",17,0,false >][< "CCC",21,0,false >,< "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],
+    'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false >][
+    < "DDD",18,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][<
+    "DDD",18,0,true > < "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false >][< "EEE",19,0,false >,<
+    "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",23,0,true > | 4 5 6][< "DDD",18,0,true > < "AAA",34,0,false > <
+    "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][< "FFF",26,0,true >],'ponerEnCola} {[< "Dabi",
+    23,0,true > | 4 5 6][< "DDD",18,0,true > < "FFF",26,0,true > < "AAA",34,0,false > < "BBB",17,0,false > <
+    "CCC",21,0,false > < "EEE",19,0,false >][cv],'entrarALocal} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >) | 3 5
+    6][< "FFF",26,0,true > < "AAA",34,0,false > < "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][
+    cv],'entrarALocal} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 2 5 6][< "AAA",34,0,
+    false > < "BBB",17,0,false > < "CCC",21,0,false > < "EEE",19,0,false >][cv],'entrarALocal} {[(< "AAA",34,0,
+    false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 5 6][< "BBB",17,0,false > < "CCC",
+    21,0,false > < "EEE",19,0,false >][cv],'ponerAEsperar} {[(< "AAA",34,0,false >,< "DDD",18,0,true >,< "Dabi",
+    23,0,true >,< "FFF",26,0,true >) | 1 5 6][< "CCC",21,0,false > < "EEE",19,0,false >][< "BBB",17,0,false >],
+    'ponerEnCola} {[(< "AAA",34,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 5 6][<
+    "CCC",21,0,false > < "EEE",19,0,false > < "BBB",17,0,false >][cv],'entrarALocal} {[(< "AAA",34,0,false >,<
+    "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 5 6][< "EEE",19,0,false >
+    < "BBB",17,0,false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,<
+    "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 4 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'BebeRefresco}
+    {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0
+    3 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false
+    >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 0 2 6][< "EEE",19,0,false > < "BBB",17,0,
+    false >][cv],'BebeRefresco} {[(< "AAA",34,0,false >,< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,
+    true >,< "FFF",26,0,true >) | 0 1 6][< "EEE",19,0,false > < "BBB",17,0,false >][cv],'salirDeLocal} {[(< "CCC",
+    21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "FFF",26,0,true >) | 1 1 6][< "EEE",19,0,false > <
+    "BBB",17,0,false >][cv],'entrarALocal} {[(< "CCC",21,0,false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,<
+    "EEE",19,0,false >,< "FFF",26,0,true >) | 0 1 6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[(< "CCC",21,0,
+    false >,< "DDD",18,0,true >,< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 0 1 6][lv][<
+    "BBB",17,0,false >],'salirDeLocal} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",
+    26,0,true >) | 1 1 6][lv][< "BBB",17,0,false >],'ponerEnCola} {[(< "DDD",18,0,true >,< "Dabi",23,0,true >,<
+    "EEE",19,0,false >,< "FFF",26,0,true >) | 1 1 6][< "BBB",17,0,false >][cv],'salirDeLocal} {[(< "Dabi",23,0,
+    true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 2 1 6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[(<
+    "Dabi",23,0,true >,< "EEE",19,0,false >,< "FFF",26,0,true >) | 2 1 6][lv][< "BBB",17,0,false >],'salirDeLocal}
+    {[(< "Dabi",23,0,true >,< "FFF",26,0,true >) | 3 1 6][lv][< "BBB",17,0,false >],'ponerEnCola} {[(< "Dabi",23,
+    0,true >,< "FFF",26,0,true >) | 3 1 6][< "BBB",17,0,false >][cv],'salirDeLocal}, {[< "Dabi",23,0,true > | 4 1
+    6][< "BBB",17,0,false >][cv],'ponerAEsperar} {[< "Dabi",23,0,true > | 4 1 6][lv][< "BBB",17,0,false >],
+    'ponerEnCola})
+***
+En este caso la afirmacion no se cumple, puesto que si el tránsito de clientes deja un refresco
+antes de que todos los clientes pasen y se vayan, obtenemos un contraejemplo, como el que nos arroja
+Maude.
+
+
+
+****************************
+*** EJERCICIO 5
+****************************
+Escribe qué reglas podrían transformarse en ecuaciones para optimizar el model checking
+para cada una de las propiedades del apartado 3.
+
+Para optimizar alcoholAcabado? :
+- ponerEnCola
+- entrarAlLocal
+- ponerAEsperar
+- bebeRefresco
+- borrachoFuera
+- salirDeLocal
+
+Para optimizar refrescosAcabados? :
+- ponerEnCola
+- entrarAlLocal
+- ponerAEsperar
+- BorrachoFuera
+- salirDeLocal
+
+Para optimizar estaEnLaCola? :
+- bebeRefresco
+- bebeCopa
+- BorrachoFuera
+- salirDeLocal
+
+Para optimizar estaEnLocal? :
+- ponerEnCola
+- ponerAEsperar
+- bebeRefresco
+- bebeCopa
+- borrachoFuera
+
+Para optimizar menosClientesDeXEnLocal? :
+- ponerEnCola
+- ponerAEsperar
+- bebeRefresco
+- bebeCopa
+**************************************************
+Lo del apartado 4 es esto:
+
+"Dabi" siempre está en el local. :
+- ponerEnCola
+- ponerAEsperar
+- bebeRefresco
+- bebeCopa
+- borrachoFuera
+
+Si el aforo no se supera al principio, entonces no se supera nunca. :
+- ponerEnCola
+- ponerAEsperar
+- bebeRefresco
+- bebeCopa
+
+Si alguien está en la cola acaba entrando :
+- bebeRefresco
+- bebeCopa
+
+El alcohol nunca se acaba. :
+- ponerEnCola
+- entrarAlLocal
+- ponerAEsperar
+- bebeRefresco
+- borrachoFuera
+- salirDeLocal
+
+Los refrescos siempre se acaban. :
+- ponerEnCola
+- entrarAlLocal
+- ponerAEsperar
+- borrachoFuera
+- salirDeLocal
+
+
+**************************************
+******		PRUEBAS		******
+**************************************
+Con este comando pruebo que todos los clientes en espera han pasado por el local, y se han marchado (sin que el menor haya entrado). Se obtienen 21 soluciones
+diferenciadas unicamente por lo que bebe la gente que pasa por el local.
+search initial =>* [D:CjtoPersonas | A:Nat H:Nat R:Nat] [L:Lista] [C:CjtoPersonas] s.t. (tam (L:Lista) == 0) /\ (cantidad(C:CjtoPersonas) == 1) /\ (A:Nat == 4) .
+
+Con este comando obtenemos "No solution", ya que "BBB" no entra nunca al Local.
+search initial =>* [D:CjtoPersonas | A:Nat H:Nat R:Nat] [L:Lista] [C:CjtoPersonas] s.t. estaEnCjto?(D:CjtoPersonas, "BBB") == true .
+

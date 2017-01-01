@@ -1,0 +1,259 @@
+*************************************
+*** JAVIER MARTÍN MORENO-MANZANARO
+*************************************
+
+mod CJTOSTRING is 
+	pr STRING . 
+	sort CjtoString .
+	subsort String < CjtoString .
+
+	op cjtoVacio : -> CjtoString [ctor] .
+	op __ : CjtoString CjtoString -> CjtoString [ctor assoc comm id: cjtoVacio].
+
+endm
+
+mod PARTABLA is
+	pr STRING .
+	pr CONFIGURATION .
+	sort ParTabla .
+	
+	op parVacio : -> ParTabla [ctor] .
+	op [_,_] : String Oid -> ParTabla [ctor] .
+endm
+
+mod TABLANODOS is
+	pr PARTABLA .
+	sort TablaNodos .
+	subsort ParTabla < TablaNodos .
+	
+	var S : String .
+	vars I I' : Oid .
+	var T : TablaNodos .
+	
+	op tv : -> TablaNodos [ctor] .
+	op __ : TablaNodos TablaNodos -> TablaNodos [ctor assoc comm id: tv] .
+	
+	op insertar : TablaNodos ParTabla -> TablaNodos .
+	eq insertar([S, I] T, [S, I']) = [S, I'] T .
+	eq insertar(T, [S, I]) = T [S, I] [owise] .
+	
+	op eliminar : TablaNodos String -> TablaNodos .
+	eq eliminar ([S, I] T, S) = T .
+	eq eliminar (T, S) = T [owise] .
+
+endm
+
+load model-checker.maude
+load full-maude.maude
+
+(omod RED is
+	pr CJTOSTRING .
+	pr TABLANODOS .
+	
+	sort Estado .
+	ops inactivo esperando activo : -> Estado [ctor] .
+	
+	class Nodo | dir : String, est : Estado, recibido : String, amigos : CjtoString .
+	class Centro | tabla : TablaNodos .
+	class Extremo | centro : Oid .
+	subclass Centro Extremo < Nodo .
+	
+	op null : -> Oid [ctor] .
+
+	msg info : String Oid -> Msg .
+	msg to_respuesta-info_ : Oid Oid -> Msg .
+	msg to_:_ : String String -> Msg .
+	msg to_:_ : Oid String -> Msg .
+	
+	vars N NE NC : Oid .
+	var S S' : String .
+	var T : TablaNodos .
+	var CS : CjtoString .
+	
+	rl [ExtremoEnvia] : 
+		< NE : Extremo | dir : S, est : inactivo >
+	=>
+		< NE : Extremo | est : esperando >
+		info (S, NE) .
+		
+	rl [CentroRecibe] : 
+		info (S, NE)
+		< NC : Centro | tabla : T >
+	=>
+		< NC : Centro | tabla : insertar(T, [S, NE]), est : activo >
+		(to NE respuesta-info NC) .
+	
+	rl [ExtremoRecibe] :
+		(to NE respuesta-info NC)
+		< NE : Extremo | est : esperando, centro : null >
+	=>
+		< NE : Extremo | est : activo, centro : NC > .
+		
+		
+		
+		
+		
+	rl [NodoSaluda] :							***Si vuelvo a colocar el amigo al que saludo, no acaba nunca
+		< N : Nodo | amigos : S CS >
+	=>
+		< N : Nodo | amigos : CS >
+		(to S : "hola") .
+		
+	rl [CentroTransforma] :							***La tabla la dejo tal cual
+		(to S : "hola")
+		< NC : Centro | tabla : [S,N] T >
+	=>
+		< NC : Centro | tabla : [S,N] T >
+		(to N : "hola") .
+		
+	rl [CentroRecibeTipo1] :						***Añado el "hola" al final de mis recibidos
+		(to S : "hola")
+		< NC : Centro | dir : S, recibido : S' >
+	=>
+		< NC : Centro | recibido : S' + "hola1" > .
+		
+	rl [NodoRecibeTipo2] :							***Añado el "hola" al final de mis recibidos
+		(to N : "hola")
+		< N : Nodo | recibido : S >
+	=>
+		< N : Nodo | recibido : S + "hola2" > .
+			
+***Segun la documentacion de Maude:
+***	mod CONFIGURATION is  
+*** 	***basic object system sorts  
+***		sorts Object Msg Configuration .  
+***	 
+*** 	***construction of configurations  
+***		subsort Object Msg < Configuration .  
+***		op none : -> Configuration [ctor] .  
+***		op __ : Configuration Configuration -> Configuration  
+***			 [ctor config assoc comm id: none] .	
+
+	var M : Msg .
+	var OB : Object .
+	var C : Configuration .
+
+	op numObjetos : Configuration -> Nat .
+	eq numObjetos (none) = 0 .
+	eq numObjetos (OB C) = 1 + numObjetos(C) .
+	eq numObjetos (M C) = numObjetos(C) .
+	
+	op numExtremos : Configuration -> Nat .
+	eq numExtremos (none) = 0 .
+	eq numExtremos (M C) = numExtremos(C) .
+	eq numExtremos (< N : Centro | > C) = numExtremos(C) .
+	eq numExtremos (< N : Extremo | > C) = 1 + numExtremos(C) .
+endom)
+
+(omod PROPS is
+	pr SATISFACTION .
+	pr RED .
+	
+	subsort Configuration < State .
+
+	var C : Configuration .
+	vars S S' : String .
+	var CS : CjtoString .
+	vars N N2 : Oid .
+	var X : Nat .
+	
+	op existe? : String -> Prop [ctor] .
+	eq 	< N : Nodo | dir : S > C 
+		|= 
+		existe? (S) = true .
+	
+	op tieneComoAmigoA : Oid Oid -> Prop [ctor] .
+	eq 	< N : Nodo | amigos : S CS > 
+		< N2 : Nodo | dir : S > C 
+		|= 
+		tieneComoAmigoA (N , N2) = true .
+	
+	op mensajePara? : String -> Prop [ctor] .
+	eq 	(to S : S') < N : Nodo | dir : S > C
+		|=
+		mensajePara? (S) = true .
+		
+	op hayXNumNodos? : Nat -> Prop [ctor] .
+	eq 	C 
+		|= 
+		hayXNumNodos? (X) = numObjetos(C) == X .
+		
+	op hayXExtremos? : Nat -> Prop [ctor] .
+	eq 	C
+		|=
+		hayXExtremos? (X) = numExtremos (C) == X .
+	
+endom)
+
+(omod EJEMPLO is
+	pr RED .
+	pr QID .
+	pr PROPS .
+	pr LTL-SIMPLIFIER .
+	pr MODEL-CHECKER .
+
+	subsort Qid < Oid .
+
+
+	op initial : -> Configuration .
+	eq initial = 	< 'c1 : Centro | dir : "0", est : inactivo, tabla : tv, recibido : "", amigos : "2" "3" >
+			< 'e1 : Extremo | dir : "1", est : inactivo, centro : null, recibido : "", amigos : "0" "3" >
+			< 'e2 : Extremo | dir : "2", est : inactivo, centro : null, recibido : "", amigos : "0" "1" >
+			< 'e3 : Extremo | dir : "3", est : inactivo, centro : null, recibido : "", amigos : "1" "2" > .
+	
+	
+endom)
+
+
+
+eof
+
+
+
+(rew initial .)
+
+*** EJERCICIO 17 ***
+*** El estado final es una configuracion cualquiera. Al usar =>* Las configuraciones van a ser todos los estados resulantes de 
+*** ir explorando el arbol de estados. Lo que hacemos es buscar un contrejemplo, y tratar de encontrar un estado
+*** cuyo numero de objetos sea distinto al inicial, en este caso 4 (Un centro y tres extremos)
+Maude> (search initial =>* C:Configuration  s.t. numObjetos(C:Configuration) =/= 4 .)
+search in EJEMPLO : initial =>* C:Configuration .
+
+No solution.
+
+
+
+***Comprobaciones model-check
+*** EJERCICIO 20 ***
+Maude> (red modelCheck (initial, [] hayXNumNodos? (4) ) .)
+reduce in EJEMPLO :
+  modelCheck(initial,[]hayXNumNodos?(4))
+result Bool :
+  true
+
+
+Maude> (red modelCheck (initial, [] (existe? ("1") /\ existe? ("2") /\ tieneComoAmigoA ('e2, 'e1)) -> <> mensajePara? ("1")) .)
+reduce in EJEMPLO :
+  modelCheck(initial,[](existe?("1")/\ existe?("2")/\ tieneComoAmigoA('e2,'e1))-> <> mensajePara?("1"))
+result Bool :
+  true
+
+
+Maude> (red modelCheck (initial, [] mensajePara? ("1") -> <>  ~ mensajePara? ("1")) .)
+reduce in EJEMPLO :
+  modelCheck(initial,[]mensajePara?("1")-> <> ~ mensajePara?("1"))
+result Bool :
+  true
+
+
+
+*** EJERCICIO 21 ***
+Tal y como está ahora la práctica, en caso de que un nodo quisiera contestar a otro que le ha enviado un mensaje
+no sabría cuál fue el origen del mismo. Una opción podría ser definir los mensajes incluyendo un parámetro más
+para determinar el origen con su IP. Además, para que los mensajes fueran genéricos sustituiríamos los "hola" por
+variables de tipo String, aunque también podemos hacer que la respuesta sea exactamente la cadena "buenas". 
+También deberíamos añadir un envío de mensaje al origen, en la parte derecha de la regla en que lo recibimos.
+Por último, para evitar ciclos infinitos de saludo-respuesta, podríamos añadir atributos extra con una lista de
+contestados y una lista de saludados. Cuando saludo, lo quito de la lista de amigos, y lo meto en la de saludados,
+y cuando contesto, envío la contestación, y meto el destino en la lista de contestados, pero sólo contesto si el 
+origen del mensaje, no está en mi lista de contestados y tampoco en mi lista de saludados.
